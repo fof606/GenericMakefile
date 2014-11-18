@@ -1,6 +1,10 @@
 #### PROJECT SETTINGS ####
 # The name of the executable to be created
-BIN_NAME := hello1
+BIN_NAME := libhello.so.1.2.3
+# The name of the executable to be created
+SONAME := libhello.so.1
+# The name of the executable to be created
+LINK_NAME := libhello.so
 # Compiler used
 CXX ?= g++
 # Extension of source files used in the project
@@ -10,7 +14,7 @@ SRC_PATH = .
 # Space-separated pkg-config libraries used by this project
 LIBS =
 # General compiler flags
-COMPILE_FLAGS = -std=c++11 -Wall -Wextra -g
+COMPILE_FLAGS = -Wall -Wextra -g -fPIC
 # Additional release-specific flags
 RCOMPILE_FLAGS = -D NDEBUG
 # Additional debug-specific flags
@@ -18,7 +22,7 @@ DCOMPILE_FLAGS = -D DEBUG
 # Add additional include paths
 INCLUDES = -I $(SRC_PATH)/
 # General linker settings
-LINK_FLAGS = 
+LINK_FLAGS = -shared -Wl,-soname,$(SONAME)
 # Additional release-specific linker settings
 RLINK_FLAGS = 
 # Additional debug-specific linker settings
@@ -62,10 +66,10 @@ debug: export LDFLAGS := $(LDFLAGS) $(LINK_FLAGS) $(DLINK_FLAGS)
 
 # Build and output paths
 release: export BUILD_PATH := build/release
-release: export BIN_PATH := bin/release
+release: export BIN_PATH := lib/release
 debug: export BUILD_PATH := build/debug
-debug: export BIN_PATH := bin/debug
-install: export BIN_PATH := bin/release
+debug: export BIN_PATH := lib/debug
+install: export BIN_PATH := lib/release
 
 # Find all source files in the source directory, sorted by most
 # recently modified
@@ -151,29 +155,39 @@ dirs:
 # Installs to the set path
 .PHONY: install
 install:
-	@echo "Installing to $(DESTDIR)$(INSTALL_PREFIX)/bin"
-	@$(INSTALL_PROGRAM) $(BIN_PATH)/$(BIN_NAME) $(DESTDIR)$(INSTALL_PREFIX)/bin
+	@echo "Installing to $(DESTDIR)$(INSTALL_PREFIX)/lib"
+	@$(INSTALL_PROGRAM) $(BIN_PATH)/$(BIN_NAME) $(DESTDIR)$(INSTALL_PREFIX)/lib
+	@echo "Making symlink: $(DESTDIR)$(INSTALL_PREFIX)/lib/$(LINK_NAME) -> $(DESTDIR)$(INSTALL_PREFIX)/lib/$(BIN_NAME)"
+	@$(RM) $(DESTDIR)$(INSTALL_PREFIX)/lib/$(LINK_NAME)
+	@cd $(DESTDIR)$(INSTALL_PREFIX)/lib; ln -s $(BIN_NAME) $(LINK_NAME)
 
 # Uninstalls the program
 .PHONY: uninstall
 uninstall:
-	@echo "Removing $(DESTDIR)$(INSTALL_PREFIX)/bin/$(BIN_NAME)"
-	@$(RM) $(DESTDIR)$(INSTALL_PREFIX)/bin/$(BIN_NAME)
+	@echo "Removing $(DESTDIR)$(INSTALL_PREFIX)/lib/$(BIN_NAME)"
+	@$(RM) $(DESTDIR)$(INSTALL_PREFIX)/lib/$(BIN_NAME)
+	@echo "Removing $(DESTDIR)$(INSTALL_PREFIX)/lib/$(LINK_NAME)"
+	@$(RM) $(DESTDIR)$(INSTALL_PREFIX)/lib/$(LINK_NAME)
 
 # Removes all build files
 .PHONY: clean
 clean:
 	@echo "Deleting $(BIN_NAME) symlink"
 	@$(RM) $(BIN_NAME)
+	@echo "Deleting $(LINK_NAME) symlink"
+	@$(RM) $(LINK_NAME)
 	@echo "Deleting directories"
 	@$(RM) -r build
-	@$(RM) -r bin
+	@$(RM) -r lib
 
 # Main rule, checks the executable and symlinks to the output
 all: $(BIN_PATH)/$(BIN_NAME)
 	@echo "Making symlink: $(BIN_NAME) -> $<"
 	@$(RM) $(BIN_NAME)
 	@ln -s $(BIN_PATH)/$(BIN_NAME) $(BIN_NAME)
+	@echo "Making symlink: $(LINK_NAME) -> $<"
+	@$(RM) $(LINK_NAME)
+	@ln -s $(BIN_PATH)/$(BIN_NAME) $(LINK_NAME)
 
 # Link the executable
 $(BIN_PATH)/$(BIN_NAME): $(OBJECTS)
