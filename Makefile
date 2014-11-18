@@ -1,10 +1,6 @@
 #### PROJECT SETTINGS ####
 # The name of the executable to be created
 BIN_NAME := libhello.so.1.2.3
-# The name of the executable to be created
-SONAME := libhello.so.1
-# The name of the executable to be created
-LINK_NAME := libhello.so
 # Compiler used
 CXX ?= g++
 # Extension of source files used in the project
@@ -22,7 +18,7 @@ DCOMPILE_FLAGS = -D DEBUG
 # Add additional include paths
 INCLUDES = -I $(SRC_PATH)/
 # General linker settings
-LINK_FLAGS = -shared -Wl,-soname,$(SONAME)
+LINK_FLAGS =
 # Additional release-specific linker settings
 RLINK_FLAGS = 
 # Additional debug-specific linker settings
@@ -50,6 +46,23 @@ ifneq ($(LIBS),)
 	COMPILE_FLAGS += $(shell pkg-config --cflags $(LIBS))
 	LINK_FLAGS += $(shell pkg-config --libs $(LIBS))
 endif
+
+# Version macros
+VERSION := $(shell echo $(BIN_NAME) | \
+		sed 's/\(lib\w*\.so\)\.\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)/\1 \2 \3/g')
+LINK_NAME := $(word 1, $(VERSION))
+VERSION_MAJOR := $(word 2, $(VERSION))
+VERSION_MINOR := $(word 3, $(VERSION))
+VERSION_PATCH := $(word 4, $(VERSION))
+VERSION_STRING := \
+	"$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_PATCH)"
+override CXXFLAGS := $(CXXFLAGS) \
+	-D VERSION_MAJOR=$(VERSION_MAJOR) \
+	-D VERSION_MINOR=$(VERSION_MINOR) \
+	-D VERSION_PATCH=$(VERSION_PATCH)
+
+SONAME=$(LINK_NAME).$(VERSION_MAJOR)
+LINK_FLAGS += -shared -Wl,-soname,$(SONAME)
 
 # Verbose option, to output compile and link commands
 export V := false
@@ -96,37 +109,11 @@ END_TIME = read st < $(TIME_FILE) ; \
 	st=$$((`date '+%s'` - $$st - 86400)) ; \
 	echo `date -u -d @$$st '+%H:%M:%S'` 
 
-# Version macros
-# Comment/remove this section to remove versioning
-USE_VERSION := false
-# If this isn't a git repo or the repo has no tags, git describe will return non-zero
-ifeq ($(shell git describe > /dev/null 2>&1 ; echo $$?), 0)
-	USE_VERSION := true
-	VERSION := $(shell git describe --tags --long --dirty --always | \
-		sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)-\?.*-\([0-9]*\)-\(.*\)/\1 \2 \3 \4 \5/g')
-	VERSION_MAJOR := $(word 1, $(VERSION))
-	VERSION_MINOR := $(word 2, $(VERSION))
-	VERSION_PATCH := $(word 3, $(VERSION))
-	VERSION_REVISION := $(word 4, $(VERSION))
-	VERSION_HASH := $(word 5, $(VERSION))
-	VERSION_STRING := \
-		"$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_PATCH).$(VERSION_REVISION)-$(VERSION_HASH)"
-	override CXXFLAGS := $(CXXFLAGS) \
-		-D VERSION_MAJOR=$(VERSION_MAJOR) \
-		-D VERSION_MINOR=$(VERSION_MINOR) \
-		-D VERSION_PATCH=$(VERSION_PATCH) \
-		-D VERSION_REVISION=$(VERSION_REVISION) \
-		-D VERSION_HASH=\"$(VERSION_HASH)\"
-endif
-
 # Standard, non-optimized release build
 .PHONY: release
 release: dirs
-ifeq ($(USE_VERSION), true)
-	@echo "Beginning release build v$(VERSION_STRING)"
-else
-	@echo "Beginning release build"
-endif
+	@echo $(SONAME)
+	@echo "Beginning release build $(VERSION_STRING)"
 	@$(START_TIME)
 	@$(MAKE) all --no-print-directory
 	@echo -n "Total build time: "
@@ -135,11 +122,7 @@ endif
 # Debug build for gdb debugging
 .PHONY: debug
 debug: dirs
-ifeq ($(USE_VERSION), true)
 	@echo "Beginning debug build v$(VERSION_STRING)"
-else
-	@echo "Beginning debug build"
-endif
 	@$(START_TIME)
 	@$(MAKE) all --no-print-directory
 	@echo -n "Total build time: "
